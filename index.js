@@ -15,33 +15,41 @@ read_data(function(err, data){
   DataBase = Buffer_to_JSON(data);
 });
 
-var read_mode = true;
+var mode_nub = 0;
+var modes = [ "Read mode" , "Register mode", "Remove mode" , "Show ID mode"];
 var playing = false;
-var led1 = tessel.led[0].output(1);
-var led2 = tessel.led[1].output(0);
+
+var led_Arr = [tessel.led[0].output(1),tessel.led[1].output(0),tessel.led[2].output(0),tessel.led[3].output(0)]
+
+/*
+var led0  = tessel.led[0].output(1);
+var led1  = tessel.led[1].output(0);
+var err   = tessel.led[2].output(0);
+var conn  = tessel.led[3].output(0);
+*/
 
 tessel.button.on('press', function(){
-  read_mode=!read_mode;
-  if (read_mode) console.log('Read mode');
-  else console.log('Register mode');
-  led1.toggle();
-  led2.toggle();
+  led_Arr[mode_nub].toggle();
+  mode_nub += 1;
+  if (mode_nub==4) mode_nub -= 4;
+  led_Arr[mode_nub].toggle();
+  console.log(modes[mode_nub]);
 });
 
 rfid.on('ready', function (version) {
-  console.log('read mode');
+  console.log('Read mode');
   rfid.on('data', function(card) {
       //console.log('UID:', card.uid.toString('hex'));
-    if(read_mode){
+    var _getId = card.uid.toString('hex');
+    if(mode_nub==0){
       //console.log('Ready to read RFID card');
       if (!playing){
-        if (check_access(card.uid.toString('hex'))){
+        if (check_access(_getId)){
           console.log('Access permission');
-          //playing = true;
           setImmediate(playSound('permission.mp3'));
         }
         else{
-          console.log('Invalid card');
+          console.log('ERROR : Invalid card (000)');
           setImmediate(playSound('denied.mp3'));
         }
       }
@@ -49,16 +57,35 @@ rfid.on('ready', function (version) {
           console.log('Please hold on');
       }
     }
-    else{
-      //console.log('Ready to register RFID card');
-      _getId = card.uid.toString('hex');
+    else if (mode_nub==1){
+      //_getId = card.uid.toString('hex');
       if (check_access(_getId)){
-        console.log('Card ID has been registered')
+        console.log('ERROR : Invalid card (001)');
       }
       else{
         DataBase[DataBase.length]=_getId;
         console.log('Card ID ' + _getId + ' registered');
       }
+    }
+    else if (mode_nub==2){
+      if (check_access(_getId)){
+        for (i=0; i<DataBase.length; i++)
+          if(DataBase[i]==_getId){
+            DataBase.splice(i,1);
+            break;
+          }
+        console.log('Card ID ' + _getId + ' is removed');
+      }
+      else{
+        console.log("ERROR : Invalid card (002)");
+      }
+      
+    }
+    else if (mode_nub==3){
+      console.log("Card ID : " + _getId);
+    }
+    else{
+      console.log("ERROR 500");
     }
   });    
 });
